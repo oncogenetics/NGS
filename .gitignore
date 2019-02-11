@@ -2,6 +2,9 @@
 .Rhistory
 .Rapp.history
 
+#VCF data files
+/data
+
 # Session Data files
 .RData
 
