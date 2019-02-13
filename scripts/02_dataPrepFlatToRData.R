@@ -13,7 +13,6 @@ setwd("C:/Users/tdadaev/Desktop/Work/GitHubProjects/NGS")
 
 library(data.table)
 
-
 # Data --------------------------------------------------------------------
 namesVCF <- gsub("_hg19.*", "", list.files("data/ShinyAppInput/", pattern = "*.GT"))
 
@@ -24,11 +23,11 @@ GT <- lapply(list.files("data/ShinyAppInput/", pattern = "*.GT", full.names = TR
   d <- fread(i)
   d <- d[ , 6:ncol(d)]
   d[] <- lapply(d, function(x){
-    ifelse(x %in% c("0","0 0","0/0"), 0, 
-           ifelse( x %in% c("0/1", "1 0", "1/0"), 1,
-                   ifelse(x == "1/1", 2, 9))) 
-    # . dots and half calls: set to missing
-    # c(".", "./.", "0/.", "1/.") is  9
+    ifelse(x == "0/0", 0, 
+           ifelse( x %in% c("0/1", "1/0"), 1,
+                   ifelse(x == "1/1", 2, 9)))
+    # dots and half calls: set to missing:
+    #    c(".", "./.", "0/.", "1/.") is  9
   })
   d <- as.matrix(d)
   colnames(d) <- NULL
@@ -55,15 +54,45 @@ ANNOT <- lapply(list.files("data/ShinyAppInput/", pattern = "*.CLNSIG", full.nam
 })
 names(ANNOT) <- namesVCF
 
+
+# ~GeneSymbols VCF --------------------------------------------------------
+#geneListVCF <- sort(unique(unlist(lapply(ANNOT, function(i) i[ , SYMBOL]))))
+geneListVCF <- rbindlist(
+  lapply(names(ANNOT), function(i) {
+    data.table(gene = sort(unique(ANNOT[[ i ]][ SYMBOL != "", SYMBOL])),
+               panel = i)
+  }))
+
+# ~GeneSymbols Panel ------------------------------------------------------
+geneListPanel <- rbindlist(
+  lapply(list.files("data/GeneLists", full.names = TRUE, recursive = TRUE),
+         function(i){
+           #i = list.files("data/GeneLists/", full.names = TRUE, recursive = TRUE)[1]
+           cbind(unique(fread(i, skip = 2, header = FALSE, col.names = "gene")),
+                 panel = fread(i, nrows = 1, header = FALSE)[, V1])
+           
+         }))
+
+# ~Annot filters -----------------------------------------------------------
+x <- unique(rbindlist(ANNOT)[, c("CLNSIG", "Consequence", "IMPACT",
+                                 "SIFT", "PolyPhen", "LoF")])
+filterCol <- list(
+  CLNSIG = sort(unique(gsub("^_", "", unlist(strsplit(x$CLNSIG[ x$CLNSIG != "."], ","))))),
+  Consequence = sort(unique(unlist(strsplit(x$Consequence, "&")))),
+  IMPACT = sort(unique(x$IMPACT)),
+  SIFT = sort(unique(gsub("\\(.*", "", x$SIFT[ x$SIFT != "" & !is.na(x$SIFT)]))),
+  PolyPhen = sort(unique(gsub("\\(.*", "", x$PolyPhen[ x$PolyPhen != "" & !is.na(x$PolyPhen)]))),
+  LoF = sort(unique(gsub("\\(.*", "", x$LoF[ x$LoF != "" & !is.na(x$LoF)]))))
+
+
+
 # output ------------------------------------------------------------------
-save(ANNOT, GT, SAMPLE, namesVCF, file = "data/data.RData")
-
-
+save(ANNOT, GT, SAMPLE, geneListVCF, geneListPanel, namesVCF, filterCol,
+     file = "data/data.RData")
 
 
 # Testing -----------------------------------------------------------------
 # GTsummary <- lapply(list.files("data/ShinyAppInput/", pattern = "*.GT", full.names = TRUE), function(i){
-#     #i = "data/ShinyAppInput/Familial_Exomes_hg19_VEPreannotated_filtered_sample_gencodev29cds10bpflank.vcf.gz.GT"
 #   d <- fread(i)
 #   d <- d[ , 6:ncol(d)]
 #   x <- table(unlist(d))
@@ -72,60 +101,3 @@ save(ANNOT, GT, SAMPLE, namesVCF, file = "data/data.RData")
 #   res
 # })
 # names(GTsummary) <- list.files("data/ShinyAppInput/", pattern = "*.GT")
-# $AEPv2_hg19_VEPreannotated_filtered_samplerenamed_gencodev29cds10bpflank.vcf.gz.GT
-# GT        N    %
-# 1 ./.  1261765 0.02
-# 2 0/0 44752969 0.85
-# 3 0/1  4080592 0.08
-# 4 1/1  2541314 0.05
-# 
-# $DRG_2441_hg19_VEPreannotated_filtered_samplerenamed_gencodev29cds10bpflank.vcf.gz.GT
-# GT        N    %
-# 1   .   124815 0.01
-# 2 0/.      190 0.00
-# 3 0/0 13673109 0.97
-# 4 0/1   204600 0.01
-# 5 1/.        1 0.00
-# 6 1/1    94060 0.01
-# 
-# $Eeles_BRCA1_Sanger_hg19_VEPreannotated_150119.vcf.gz.GT
-# GT    N %
-# 1   0    4 0
-# 2 0 0 3520 1
-# 3 1 0    4 0
-# 
-# $Eeles_BRCA2_FCAP_hg19_VEPreannotated_150119.vcf.gz.GT
-# GT     N %
-# 1   0    20 0
-# 2 0 0 36518 1
-# 3 1 0    22 0
-# 
-# $Familial_Exomes_hg19_VEPreannotated_filtered_sample_gencodev29cds10bpflank.vcf.gz.GT
-# GT       N    %
-# 1 ./.   26687 0.01
-# 2 0/0 3679495 0.74
-# 3 0/1  738366 0.15
-# 4 1/0    1967 0.00
-# 5 1/1  493867 0.10
-# 
-# $MCK_191_hg19_VEPreannotated_filtered_sample_gencodev29cds10bpflank.vcf.gz.GT
-# GT     N    %
-# 1 ./.   315 0.00
-# 2 0/0 67400 0.90
-# 3 0/1  4567 0.06
-# 4 1/0    53 0.00
-# 5 1/1  2346 0.03
-
-
-
-
-# vcfR didn't work, too heavy on memory
-# library(vcfR)
-# 
-# fileVCF_Familial ="data/DRG_2441_hg19_VEPreannotated_filtered_samplerenamed_gencodev29cds10bpflank.vcf.gz"
-# vcf <- read.vcfR(fileVCF_Familial)#, verbose = FALSE )
-# 
-# chromoqc(vcf, dp.alpha=20)
-# 
-# vcf@fix
-# x <- vcfR2tidy(vcf)

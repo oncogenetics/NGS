@@ -5,96 +5,76 @@
 # User interface file for shiny
 
 
-tweaks <- 
-  list(
-    #push it down 70px to avoid going under navbar
-    tags$style(type = "text/css", "body {padding-top: 70px;}"),
-    tags$head(
-      tags$style(HTML("
-                      #graphplotSNP_LDnetwork {
-                      border: 1px solid grey;
-                      }
-                      ")))#,
-    #hide red error messages
-    # tags$style(type="text/css",
-    #            ".shiny-output-error { visibility: hidden; }",
-    #            ".shiny-output-error:before { visibility: hidden; }")
-      )
 
 # Define UI ---------------------------------------------------------------
 shinyUI(
-  navbarPage(
-    # Application title
-    id = "navBarPageID",
-    title = div(h4("NGS v0.1",
-                   style = "margin-top: 0px;"),
-                img(src = "icr_logo_white_on_black.PNG", height = "70px",
-                    style = "position: relative; top: -60px; right: -800px;")),
-    windowTitle = "NGS",
-    fluid = FALSE,
-    position = "fixed-top",
-    inverse = TRUE,
-    
+  fluidPage(theme = shinytheme("united"),
+    titlePanel("NGS v0.1", "NGS"),
     # 1.Input Data ------------------------------------------------------------
     tabPanel(
       "1.Input Data",
-      # ~~~ sidebarPanel ------------------------------------------------------
+      # ~ sidebarPanel ------------------------------------------------------
       sidebarPanel(
-        tweaks,
         #Choose data type
-        radioButtons("dataType", h4("Input data:"),
-                     c("Prostate OncoArray Fine-mapping" = "OncoArrayFineMapping",
-                       #"Prostate OncoArray Meta" = "OncoArrayMeta",
-                       #"Prostate iCOGS" = "iCOGS",
-                       "Custom" = "Custom"
-                       #"Example" = "Example"
-                     ),
-                     selected = "OncoArrayFineMapping")
+        uiOutput("ui_data"),
+        selectInput("genePanel", "Selected panel(s)", sort(unique(geneListPanel$panel)),
+                    selected = "PROCA", multiple = TRUE, selectize = TRUE),
+        uiOutput("ui_gene"),
+        hr(),
+        h5("Filter Variants:"),
+        # ClinVar
+        selectInput("CLNSIG", "ClinVar", filterCol$CLNSIG,
+                    selected = filterCol$CLNSIG[11], multiple = TRUE, selectize = TRUE),
+        # VEP
+        selectInput("Consequence", "Consequence", filterCol$Consequence,
+                    selected = filterCol$Consequence[1], multiple = TRUE, selectize = TRUE),
+        checkboxGroupInput("IMPACT", "IMPACT", filterCol$IMPACT, inline = TRUE),
+        checkboxGroupInput("LoF", "LoF", filterCol$LoF, inline = TRUE),
+        checkboxGroupInput("SIFT", "SIFT", filterCol$SIFT, inline = TRUE),
+        checkboxGroupInput("PolyPhen", "PolyPhen", filterCol$PolyPhen, inline = TRUE)
         ),#sidebarPanel
-      # ~~~ mainPanel---------------------------------------------------------
+      # ~ mainPanel---------------------------------------------------------
       mainPanel(
         tabsetPanel(
-          tabPanel("Summary",
-                   h4("Summary"),
-                   hr()),
+          tabPanel("Variants",
+                   h4("Variants"),
+                   hr(),
+                   dataTableOutput("annot")
+          ),
           tabPanel("Association",
                    h4("Association"),
-                   hr())
-          )#tabsetPanel
-        )#mainPanel
-      ),#tabPanel - Data
-    # 2.Plot Settings ---------------------------------------------------------  
-    tabPanel(
-      "2.Plot Settings",
-      # ~~~ sidebarPanel ----------------------------------------------
-             sidebarPanel(
-               h4("SNP Filters:")
-               ), # END sidebarPanel
-      # ~~~ mainPanel -----------------------------------------------
-      mainPanel(
-        
-      ) # END mainPanel
-    ), #tabPanel - "2.Plot Settings"
-    # 3.Help ------------------------------------------------------------------
-    navbarMenu(title = "Help",
-               icon = icon("info"),
-               tabPanel("About",
-                        h4("About"),
-                        hr(),
-                        includeMarkdown("README.md")),
-               tabPanel("R Session Info",
-                        h4("R Session Info"),
-                        hr(),
-                        includeMarkdown("Markdown/RSessionInfo.md")),
-               tabPanel("Raw data - VCFs",
-                        h4("Raw data - VCFs"),
-                        hr(),
-                        img(src = "logoICR.png"),
-                        hr(),
-                        includeMarkdown("Markdown/ICR_Data.md"))
-               )#navbarMenu - Help
-    )#navbarPage
-  )#shinyUI
+                   hr()),
+          tabPanel("Plots",
+                   h4("Plots"),
+                   hr()),
+          # ~~ Help -------------------------------------------------------
+          tabPanel("Help",
+                   h4("Help"),
+                   hr(),
+                   tabsetPanel(
+                     tabPanel("About",
+                              h4("About"),
+                              hr(),
+                              includeMarkdown("README.md")),
+                     tabPanel("R Session Info",
+                              h4("R Session Info"),
+                              hr(),
+                              includeMarkdown("Markdown/RSessionInfo.md")),
+                     tabPanel("Raw data - VCFs",
+                              h4("Raw data - VCFs"),
+                              hr(),
+                              img(src = "logoICR.png"),
+                              hr(),
+                              includeMarkdown("Markdown/ICR_Data.md")),
+                     shinythemes::themeSelector(),
+                     type = "pills")#tabsetPanel
+          )#tabPanel
+        )#tabsetPanel
+      )#mainPanel
+    )#tabPanel
+  )#fluidPage
+)#shinyUI
+
 
 
 

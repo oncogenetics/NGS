@@ -5,6 +5,9 @@
 #VCF data files
 /data
 
+#temp files
+/temp
+
 # Session Data files
 .RData
 
