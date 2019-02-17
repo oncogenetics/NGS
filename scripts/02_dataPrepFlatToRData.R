@@ -47,9 +47,10 @@ names(SAMPLE) <- namesVCF
 ANNOT <- lapply(list.files("data/ShinyAppInput/", pattern = "*.CLNSIG", full.names = TRUE), function(i){
   #i = "data/ShinyAppInput/Familial_Exomes_hg19_VEPreannotated_filtered_sample_gencodev29cds10bpflank.vcf.gz.CLNSIG"
   #clinvar
-  CLNSIG <- fread(i)
+  CLNSIG <- fread(i, sep = "\t", na.strings = c("", ".", "NA"))
+  CLNSIG$CHROM <- as.character(CLNSIG$CHROM)
   #vep
-  CSQ <- fread(gsub("CLNSIG", "CSQ", i, fixed = TRUE))
+  CSQ <- fread(gsub("CLNSIG", "CSQ", i, fixed = TRUE), sep = "|", na.strings = c("", ".", "NA"))
   cbind(CLNSIG, CSQ)
 })
 names(ANNOT) <- namesVCF
@@ -77,17 +78,22 @@ geneListPanel <- rbindlist(
 x <- unique(rbindlist(ANNOT)[, c("CLNSIG", "Consequence", "IMPACT",
                                  "SIFT", "PolyPhen", "LoF")])
 filterCol <- list(
-  CLNSIG = sort(unique(gsub("^_", "", unlist(strsplit(x$CLNSIG[ x$CLNSIG != "."], ","))))),
+  CLNSIG = sort(unique(gsub("^_", "", unlist(strsplit(x$CLNSIG[ !is.na(x$CLNSIG) ], "[,/]"))))),
   Consequence = sort(unique(unlist(strsplit(x$Consequence, "&")))),
-  IMPACT = sort(unique(x$IMPACT)),
-  SIFT = sort(unique(gsub("\\(.*", "", x$SIFT[ x$SIFT != "" & !is.na(x$SIFT)]))),
-  PolyPhen = sort(unique(gsub("\\(.*", "", x$PolyPhen[ x$PolyPhen != "" & !is.na(x$PolyPhen)]))),
-  LoF = sort(unique(gsub("\\(.*", "", x$LoF[ x$LoF != "" & !is.na(x$LoF)]))))
+  IMPACT = sort(unique(x$IMPACT[ !is.na(x$IMPACT) ])),
+  SIFT = sort(unique(gsub("\\(.*", "", x$SIFT[ !is.na(x$SIFT) ]))),
+  PolyPhen = sort(unique(gsub("\\(.*", "", x$PolyPhen[ !is.na(x$PolyPhen) ]))),
+  LoF = sort(unique(gsub("\\(.*", "", x$LoF[ !is.na(x$LoF) ]))))
 
 
+
+# ~ Phenotype ---------------------------------------------------------------
+pheno <- fread("data/20190215_progeny.csv",
+               check.names = TRUE, na.strings = c("U", "", "NA"))
+pheno <- pheno[ Study.ID %in% unique(unlist(SAMPLE)), ]
 
 # output ------------------------------------------------------------------
-save(ANNOT, GT, SAMPLE, geneListVCF, geneListPanel, namesVCF, filterCol,
+save(ANNOT, GT, SAMPLE, geneListVCF, geneListPanel, namesVCF, filterCol, pheno,
      file = "data/data.RData")
 
 

@@ -23,12 +23,12 @@ if(Sys.info()['sysname'] == "Windows") {
 }
 
 DToptions <- list(
-  pageLength = 20,
+  pageLength = 50,
   lengthMenu = c(10, 20, 50, 100),
   buttons = list(list(extend = 'csv', filename = 'output')),
-  dom = 'Bfrtip'
+  dom = 'Bfrtip',
   # dom = "t",
-  # fixedHeader = TRUE,
+  fixedHeader = TRUE
   # paging = FALSE
 )
 
@@ -37,3 +37,15 @@ DToptions <- list(
 # GT
 # SAMPLE
 load("data/data.RData")
+
+# runApp(shinyApp(
+#   ui = fluidPage(
+#     DT::dataTableOutput("results", height = 300)
+#   ),
+#   server = function(input, output, session) {
+#     output$results <- DT::renderDataTable(
+#       mtcars,
+#       options = list(pageLength = 200, scrollY = TRUE)
+#     )
+#   }
+# ))
