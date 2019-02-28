@@ -18,13 +18,16 @@ shinyUI(
     sidebarPanel(width = 3,
       #Choose data type
       checkboxGroupInput("data", "Data",
-                         choices = namesVCF, selected = namesVCF[1]),
+                         choices = 
+                           setNames(namesVCF, gsub("_", " ", namesVCF)),
+                         selected = namesVCF[1]),
       conditionalPanel(
         condition = "input.tabsetPanelMain == 'Variants'",
-        selectInput("genePanel", "Selected panel(s)",
-                    sort(unique(geneListPanel$panel)),
-                    selected = "PROCA",
-                    multiple = TRUE, selectize = TRUE),
+        radioButtons("typePanel", "Select panel type:",
+                     c("Wood R.D." = "DNA_repair_pathways_Woods",
+                       "ICR curated" = "ICR",
+                       "MutSigDB Hallmark" = "MutSigDB_hallmark")),
+        uiOutput("ui_genePanel"),
         uiOutput("ui_gene"),
         radioButtons("andOr", "FilterOption", choices = c("AND", "OR"),
                      selected = "OR", inline = TRUE),
@@ -62,6 +65,9 @@ shinyUI(
                  hr(),
                  tableOutput("testGT"),
                  dataTableOutput("gt")),
+        tabPanel("SKAT",
+                 h4("SKAT"),
+                 dataTableOutput("skat")),
         tabPanel("Plots",
                  h4("Plots"),
                  hr()),
@@ -84,7 +90,9 @@ shinyUI(
                             img(src = "logoICR.png"),
                             hr(),
                             includeMarkdown("Markdown/ICR_Data.md")),
-                   shinythemes::themeSelector(),
+                   tabPanel("Theme",
+                            hr("Theme"),
+                            shinythemes::themeSelector()),
                    type = "pills")#tabsetPanel
         )#tabPanel
       )#tabsetPanel

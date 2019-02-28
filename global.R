@@ -6,7 +6,7 @@
 # install.packages(c("shiny", "data.table", "dplyr", "lazyeval",
 #                    "ggplot2", "ggrepel", "knitr", "markdown","DT",
 #                    "UpSetR", "shinythemes",
-#                    "rlang", "scales", "later"))
+#                    "rlang", "scales", "later", "SKAT"))
 
 library(shiny)
 library(data.table)
@@ -14,6 +14,7 @@ library(DT)
 library(ggplot2)
 library(UpSetR)
 library(shinythemes)
+library(SKAT)
 
 
 

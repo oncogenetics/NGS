@@ -68,10 +68,10 @@ geneListVCF <- rbindlist(
 geneListPanel <- rbindlist(
   lapply(list.files("data/GeneLists", full.names = TRUE, recursive = TRUE),
          function(i){
-           #i = list.files("data/GeneLists/", full.names = TRUE, recursive = TRUE)[1]
+           #i = list.files("data/GeneLists", full.names = TRUE, recursive = TRUE)[1]
            cbind(unique(fread(i, skip = 2, header = FALSE, col.names = "gene")),
-                 panel = fread(i, nrows = 1, header = FALSE)[, V1])
-           
+                 panel = fread(i, nrows = 1, header = FALSE)[, V1], 
+                 panelType = unlist(strsplit(i, "/", fixed = TRUE))[3])
          }))
 
 # ~Annot filters -----------------------------------------------------------
@@ -91,6 +91,9 @@ filterCol <- list(
 pheno <- fread("data/20190215_progeny.csv",
                check.names = TRUE, na.strings = c("U", "", "NA"))
 pheno <- pheno[ Study.ID %in% unique(unlist(SAMPLE)), ]
+pheno[ , TStage := as.integer(gsub("T", "", TStage, fixed = TRUE)) ]
+pheno[ , NStage := as.integer(gsub("N", "", NStage, fixed = TRUE)) ]
+pheno[ , MStage := as.integer(gsub("M", "", MStage, fixed = TRUE)) ]
 
 # output ------------------------------------------------------------------
 save(ANNOT, GT, SAMPLE, geneListVCF, geneListPanel, namesVCF, filterCol, pheno,
