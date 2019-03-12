@@ -16,55 +16,102 @@ shinyUI(
                                            height = "40")), "NGS"),
     # ~ sidebarPanel ------------------------------------------------------
     sidebarPanel(width = 3,
-      #Choose data type
-      checkboxGroupInput("data", "Data",
-                         choices = 
-                           setNames(namesVCF, gsub("_", " ", namesVCF)),
-                         selected = namesVCF[1]),
-      conditionalPanel(
-        condition = "input.tabsetPanelMain == 'Variants'",
-        radioButtons("typePanel", "Select panel type:",
-                     c("Wood R.D." = "DNA_repair_pathways_Woods",
-                       "ICR curated" = "ICR",
-                       "MutSigDB Hallmark" = "MutSigDB_hallmark")),
-        uiOutput("ui_genePanel"),
-        uiOutput("ui_gene"),
-        radioButtons("andOr", "FilterOption", choices = c("AND", "OR"),
-                     selected = "OR", inline = TRUE),
-        # ClinVar
-        selectInput("CLNSIG", "CLNSIG (ClinVar)", filterCol$CLNSIG,
-                    #selected = filterCol$CLNSIG[11],
-                    multiple = TRUE, selectize = TRUE),
-        # VEP
-        selectInput("Consequence", "Consequence", filterCol$Consequence,
-                    #selected = filterCol$Consequence[1],
-                    multiple = TRUE, selectize = TRUE),
-        checkboxGroupInput("IMPACT", "IMPACT", filterCol$IMPACT, inline = TRUE),
-        checkboxGroupInput("LoF", "LoF", filterCol$LoF, inline = TRUE),
-        checkboxGroupInput("SIFT", "SIFT", filterCol$SIFT, inline = TRUE),
-        checkboxGroupInput("PolyPhen", "PolyPhen", filterCol$PolyPhen,
-                           inline = TRUE)
-      )
-      
+                 checkboxGroupInput("data", "Data",
+                                    choices = 
+                                      setNames(namesVCF, gsub("_", " ", namesVCF)),
+                                    selected = namesVCF[1]),
+                 hr(),
+                 conditionalPanel(
+                   condition = "input.tabsetPanelMain == 'Panel'",
+                   radioButtons("typePanel", "Select panel type:",
+                                c("ICR curated" = "ICR",
+                                  "Wood R.D." = "DNA_repair_pathways_Woods",
+                                  "MutSigDB Hallmark" = "MutSigDB_hallmark")),
+                   uiOutput("ui_genePanel"),
+                   uiOutput("ui_gene")
+                 ),
+                 conditionalPanel(
+                   condition = "input.tabsetPanelMain == 'Variants'",
+                   splitLayout(
+                     sliderInput("qcMissVariant", "Variant missingness", min = 0, max = 0.5, value = 0.5),
+                     sliderInput("qcMissSample", "Sample missingness", min = 0, max = 0.5, value = 0.5),
+                     radioButtons("andOr", "FilterOption", choices = c("AND", "OR"),
+                                  selected = "OR", inline = TRUE)
+                   ),
+                   
+                   # ClinVar
+                   selectInput("CLNSIG", "CLNSIG (ClinVar)", filterCol$CLNSIG,
+                               #selected = filterCol$CLNSIG[11],
+                               multiple = TRUE, selectize = TRUE),
+                   # VEP
+                   selectInput("Consequence", "Consequence", filterCol$Consequence,
+                               #selected = filterCol$Consequence[1],
+                               multiple = TRUE, selectize = TRUE),
+                   checkboxGroupInput("IMPACT", "IMPACT", filterCol$IMPACT, inline = TRUE),
+                   checkboxGroupInput("LoF", "LoF", filterCol$LoF, inline = TRUE),
+                   checkboxGroupInput("SIFT", "SIFT", filterCol$SIFT, inline = TRUE),
+                   checkboxGroupInput("PolyPhen", "PolyPhen", filterCol$PolyPhen,
+                                      inline = TRUE),
+                   radioButtons("plotParallelVariantGrp", "Parallel plot group:",
+                                c("SYMBOL", "IMPACT", "LoF", "REVEL", "CADD_PHRED"),
+                                inline = TRUE)
+                 ),
+                 conditionalPanel(
+                   condition = "input.tabsetPanelMain == 'Phenotype'",
+                   radioButtons("plotParallelSampleGrp", "Parallel plot group:",
+                                c("FH", "COD_PrCa", "AgeDiag", "GleasonScore", "NCCN", "NICE", "TStage", "NStage", "MStage", "PSADiag"),
+                                inline = TRUE),
+                   checkboxGroupInput("ethnicityOA", "Ethnicity OA:",
+                                      c("African", "Asian", "European", "Mixed_ethnic", NA),
+                                      selected = "European",
+                                      inline = TRUE),
+                   checkboxGroupInput("ethnicity", "Ethnicity:",
+                                      c("0", "1", "6", "7", "8", NA),
+                                      selected = "1",
+                                      inline = TRUE)
+                   
+                   
+                   
+                 )
+                 
+                 
+                 
+                 
     ),#sidebarPanel
     # ~ mainPanel---------------------------------------------------------
     mainPanel(
       tabsetPanel(
         id = "tabsetPanelMain",
+        tabPanel("Panel",
+                 h4("Panel"),
+                 hr(),
+                 dataTableOutput("genes"),
+                 plotOutput("geneOverlap")
+        ),
         tabPanel("Variants",
                  h4("Variants"),
                  hr(),
-                 tableOutput("testInput"),
+                 #tableOutput("testInput"),
+                 plotOutput("variantOverlap"),
+                 plotOutput("variantParallel"),
                  dataTableOutput("annot")),
         tabPanel("Phenotype",
                  h4("Phenotype"),
                  hr(),
-                 dataTableOutput("pheno")),
+                 plotOutput("phenoSampleOverlap"),
+                 plotOutput("phenoParallel"),
+                 plotOutput("phenoNA"),
+                 dataTableOutput("pheno")
+        ),
         tabPanel("Genotype",
                  h4("Genotype"),
                  hr(),
                  tableOutput("testGT"),
-                 dataTableOutput("gt")),
+                 dataTableOutput("gt"),
+                 plotOutput("qcMissGT"),
+                 plotOutput("qcMissGTperGene")
+                 
+        ),
         tabPanel("SKAT",
                  h4("SKAT"),
                  dataTableOutput("skat")),

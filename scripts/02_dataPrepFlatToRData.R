@@ -2,7 +2,7 @@
 # Author: Tokhir Dadaev
 # License: MIT + file LICENSE.txt
 #
-# 08/02/2019
+# 01/03/2019
 # VCFs converted to flat files, now convert to RData to load for ShinyApp
 # - input: flat files: "data\ShinyAppInput"
 # - output: RData for shiny
@@ -13,35 +13,70 @@ setwd("C:/Users/tdadaev/Desktop/Work/GitHubProjects/NGS")
 
 library(data.table)
 
+convertGT <- function(x){
+  ifelse(x == "0/0", 0, 
+         ifelse(x %in% c("0/1", "1/0"), 1,
+                ifelse(x == "1/1", 2, 9)))
+  # dots and half calls: set to missing:
+  #    c(".", "./.", "0/.", "1/.") is  9
+}
+
 # Data --------------------------------------------------------------------
 namesVCF <- gsub("_hg19.*", "", list.files("data/ShinyAppInput/", pattern = "*.GT"))
 
 
 # ~Genotype ----------------------------------------------------------------
-GT <- lapply(list.files("data/ShinyAppInput/", pattern = "*.GT", full.names = TRUE), function(i){
-  #i = "data/ShinyAppInput/Familial_Exomes_hg19_VEPreannotated_filtered_sample_gencodev29cds10bpflank.vcf.gz.GT"
-  d <- fread(i)
-  d <- d[ , 6:ncol(d)]
-  d[] <- lapply(d, function(x){
-    ifelse(x == "0/0", 0, 
-           ifelse( x %in% c("0/1", "1/0"), 1,
-                   ifelse(x == "1/1", 2, 9)))
-    # dots and half calls: set to missing:
-    #    c(".", "./.", "0/.", "1/.") is  9
-  })
-  d <- as.matrix(d)
-  colnames(d) <- NULL
-  d
-})
-names(GT) <- namesVCF
+GT <- rbindlist(
+  lapply(list.files("data/ShinyAppInput/", pattern = "*.GT", full.names = TRUE), function(i){
+    #i = "data/ShinyAppInput/Familial_Exomes_hg19_VEPreannotated_filtered_sample_gencodev29cds10bpflank.vcf.gz.GT"
+    s <- fread(gsub(".GT", ".SAMPLE", i, fixed = TRUE), header = FALSE)[, V1]
+    d <- fread(i, drop = 1:5, col.names = s)
+    cols <- colnames(d)
+    d[ , (cols) := lapply(.SD, convertGT), .SDcols = cols ]
+    
+    varname <- fread(i, select = 1:5)
+    varname <- paste(varname$V1, varname$V2, varname$V4, varname$V5, sep = "_" )
+    
+    melt(cbind(varname = varname, d),
+         id.vars = "varname", variable.name = "sampleID")[ (value != 9), ]
+    # res$vcf <- gsub("_hg19.*", "", basename(i))
+    # res
+  }))
+
+# GT[ , cnt := .N, by = .(varname, sampleID) ]
+# GT[ , cntUnique := length(unique(value)), by = .(varname, sampleID) ]
+# xx <- GT[ cnt > 1, ]
+# dim(xx)
+
+# > dim(xx)
+# [1] 391724      4
+# > length(unique(xx$varname))
+# [1] 69490
+# > length(unique(xx$sampleID))
+# [1] 774
+
+# [1] 111108      4
+# length(unique(xx$varname))
+# [1] 1375
+# length(unique(xx$sampleID))
+# [1] 771
+# GT$rn <- rowidv(GT, cols = c("varname", "sampleID"))
+# GT[, .(rn := seq_len(.N)), by = .(varname, sampleID)]
+# GT[ , rn := rowid(), by = .(varname, sampleID) ]
+# table(GT[ !(G %in% c(0,1,2)), G])
+# GT[ is.na(G), ]
+# length(unique(GT$varname))
+
+# to-do:get max when discordant, temp solution, will need to change...
+GT[ , value := max(value), by = .(varname, sampleID) ]
+GT <- unique(GT)
+GT <- dcast(GT, varname ~ sampleID)
 
 # ~Sample ID ---------------------------------------------------------------
 SAMPLE <- lapply(list.files("data/ShinyAppInput/", pattern = "*.SAMPLE", full.names = TRUE), function(i){
   fread(i, header = FALSE)[, V1]
   })
 names(SAMPLE) <- namesVCF
-
-
 
 # ~Annot: clinvar+vep ------------------------------------------------------
 ANNOT <- lapply(list.files("data/ShinyAppInput/", pattern = "*.CLNSIG", full.names = TRUE), function(i){
@@ -51,10 +86,11 @@ ANNOT <- lapply(list.files("data/ShinyAppInput/", pattern = "*.CLNSIG", full.nam
   CLNSIG$CHROM <- as.character(CLNSIG$CHROM)
   #vep
   CSQ <- fread(gsub("CLNSIG", "CSQ", i, fixed = TRUE), sep = "|", na.strings = c("", ".", "NA"))
-  cbind(CLNSIG, CSQ)
+  cbind(
+    varname = paste(CLNSIG$CHROM, CLNSIG$POS, CLNSIG$REF, CLNSIG$ALT, sep = "_"),
+    CLNSIG, CSQ)
 })
 names(ANNOT) <- namesVCF
-
 
 # ~GeneSymbols VCF --------------------------------------------------------
 #geneListVCF <- sort(unique(unlist(lapply(ANNOT, function(i) i[ , SYMBOL]))))
@@ -91,9 +127,22 @@ filterCol <- list(
 pheno <- fread("data/20190215_progeny.csv",
                check.names = TRUE, na.strings = c("U", "", "NA"))
 pheno <- pheno[ Study.ID %in% unique(unlist(SAMPLE)), ]
-pheno[ , TStage := as.integer(gsub("T", "", TStage, fixed = TRUE)) ]
-pheno[ , NStage := as.integer(gsub("N", "", NStage, fixed = TRUE)) ]
-pheno[ , MStage := as.integer(gsub("M", "", MStage, fixed = TRUE)) ]
+
+pheno[ , rs138213197 := factor(rs138213197) ]
+pheno[ , EthnicityOA := factor(Onco_GenoAncestry) ]
+pheno[ , COD_PrCa := factor(ifelse(tolower(Cause.of.death.is.PrCa) == "yes", 1,
+                                   ifelse(tolower(Cause.of.death.is.PrCa) == "no", 0, NA))) ]
+pheno[ , TStage := factor(gsub("T", "", TStage, fixed = TRUE)) ]
+pheno[ , NStage := factor(gsub("N", "", NStage, fixed = TRUE)) ]
+pheno[ , MStage := factor(gsub("M", "", MStage, fixed = TRUE)) ]
+
+pheno[ , FH := factor(ifelse(FH == "Yes", 1, ifelse(FH == "No", 0, NA))) ]
+pheno[ , PSADiag := round(PSADiag, 1) ]
+
+pheno[ , NCCN := factor(NCCN, levels = c("Low", "Intermediate", "High", "VeryHigh", "Metastatic")) ]
+pheno[ , NICE := factor(NICE, levels = c("Low", "Intermediate", "High")) ]
+
+
 
 # output ------------------------------------------------------------------
 save(ANNOT, GT, SAMPLE, geneListVCF, geneListPanel, namesVCF, filterCol, pheno,

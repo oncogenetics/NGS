@@ -7,6 +7,9 @@
 
 #temp files
 /temp
+x_*.*
+temp_*.*
+example*.*
 
 # Session Data files
 .RData
