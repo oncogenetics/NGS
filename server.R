@@ -22,13 +22,22 @@ shinyServer(function(input, output, session) {
   # ANNOT -------------------------------------------------------------------
   # filter on gene symbol
   subsetAnnot <- reactive({
-    # todo: ExAC_AF_NFE compare, compare MAF over selected VCFs
+    # todo: compare MAF over selected VCFs
     
     rbindlist(
       lapply(input$data, function(i){
         cbind(data = i, ANNOT[[i]][ (SYMBOL %in% input$gene), ])
-        
-      }))  
+      }))
+    
+    # x <- c("ATM","BRCA1","BRCA2","CHEK2","GEN1","MSH2","MSH5","NBN","PALB2")
+    # d <- rbindlist(
+    #   lapply(namesVCF[1:2], function(i){
+    #     cbind(data = i, ANNOT[[i]][ (SYMBOL %in% x), ])
+    #   })) 
+    # d[ varname %in% d[ duplicated(varname), varname], ][order(varname), ]
+    
+    
+    
   })
   # filter on feature
   subsetAnnotFilter <- reactive({
@@ -158,19 +167,51 @@ shinyServer(function(input, output, session) {
   })
   
   # Pheno -------------------------------------------------------------------
+  # to-do: get rid of ifelse control... manage NAs better
   subsetPheno <- reactive({
-    pheno[ Study.ID %in% unique(unlist(SAMPLE[ input$data ])) &
-             (Ethnicity %in% input$ethnicity |
-                Onco_GenoAncestry %in% input$ethnicityOA),
-           list(
-             StudyID = Study.ID,
-             #Carrier = as.factor(if_else(Study.ID %in% subsetSamples(), "Yes", "No")),
-             rs138213197,
-             Ethnicity, EthnicityOA,
-             AgeDiag, COD_PrCa, FH,
-             GleasonScore, TStage, NStage, MStage, PSADiag,
-             NCCN, NICE) ]
+    pheno[ 
+      (
+        Study.ID %in% unique(unlist(SAMPLE[ input$data ])) &
+          ifelse(is.na(PrCa), "NA", as.character(PrCa)) %in% input$samplePrCa &
+          
+          (ifelse(is.na(Ethnicity), "NA", Ethnicity)  %in% input$sampleEthnicity |
+             ifelse(is.na(Onco_GenoAncestry), "NA", Onco_GenoAncestry)  %in% input$sampleEthnicityOA) &
+          
+          ifelse(is.na(FH), "NA", as.character(FH)) %in% input$sampleFH &
+          ifelse(is.na(COD_PrCa), "NA", as.character(COD_PrCa)) %in% input$sampleCOD &
+          
+          ifelse(is.na(AgeDiag), 0, AgeDiag) >= input$sampleAge[1] &
+          ifelse(is.na(AgeDiag), 0, AgeDiag) <= input$sampleAge[2] &
+          
+          ifelse(is.na(GleasonScore), 0, GleasonScore) >= input$sampleGleason[1] &
+          ifelse(is.na(GleasonScore), 0, GleasonScore) <= input$sampleGleason[2] &
+          
+          ifelse(is.na(PSADiag), -1, PSADiag) >= input$samplePSADiag[1] &
+          ifelse(ifelse(is.na(PSADiag), -1, PSADiag) > 100, 100,
+                 ifelse(is.na(PSADiag), -1, PSADiag)) <= input$samplePSADiag[2] &
+          
+          ifelse(is.na(TStage), "NA", as.character(TStage)) %in% input$sampleTStage &
+          ifelse(is.na(NStage), "NA", as.character(NStage)) %in% input$sampleNStage &
+          ifelse(is.na(MStage), "NA", as.character(MStage)) %in% input$sampleMStage
+      ) 
+      , 
+      list(
+        StudyID = Study.ID,
+        PrCa,
+        #rs138213197,
+        Ethnicity, EthnicityOA,
+        AgeDiag, COD_PrCa, FH,
+        GleasonScore, TStage, NStage, MStage, PSADiag,
+        NCCN, NICE) ]
   })
+  
+  output$testFH <- renderTable({
+    data.frame(class = class(input$sampleFH),
+               values = paste(input$sampleFH, collapse = ","))
+  })
+  
+  
+
   
   # Stats -------------------------------------------------------------------
   
@@ -179,12 +220,13 @@ shinyServer(function(input, output, session) {
     d <- merge(subsetAnnotFilter()[ , list(varname = varname, gene = SYMBOL)],
                subsetGTmiss(), by = "varname")
     
-    # d <- merge(ANNOT$AEPv2[ , list(varname, gene = SYMBOL)],
-    #            GT[1:1000, 1:10], by = "varname")
-    setcolorder(d, c("varname", "gene"))
+    # d <- merge(subsetAnnot[ , list(varname = varname, gene = SYMBOL)],
+    #            subsetGT, by = "varname")
+    # setcolorder(d, c("varname", "gene"))
     
     out <- rbindlist(
-      lapply(c("TStage", "NStage", "MStage"), function(caco){
+      #lapply(c("TStage", "NStage", "MStage"), function(caco){
+      lapply(c("TStage", "NStage"), function(caco){
         #lapply(c("GleasonScore", "TStage", "NStage", "MStage", "PSADiag"), function(caco){
         #caco="TStage"
         #lapply(c("TStage","NStage", "MStage"), function(caco){
@@ -200,12 +242,13 @@ shinyServer(function(input, output, session) {
         
         rbindlist(
           lapply(split(d, d$gene), function(geneGT){
-            #gene = "LOXL4"; caco = "TStage"
+            #gene = "BRCA2"; caco = "TStage"
             #geneGT <- split(d, d$gene)[[ gene ]]
             #ixVariant <- which(aa$SYMBOL == gene)
             
             # SKAT input
-            Y <- unlist(pp[ ixSample, ..caco ])
+            Y <- as.numeric(unlist(pp[ ixSample, ..caco ]))
+            if(skatTrait == "D"){ Y <- Y - 1 }
             Z <- t(geneGT[ , -c(1:2) ][ , ..ixSample ])
             Z[ Z == 9 ] <- NA
             X <- pp[ ixSample, AgeDiag]
@@ -240,10 +283,72 @@ shinyServer(function(input, output, session) {
   
   
   # ~Gene Burden -------------------------------------------------------------
+  statBurden <- reactive({
+    # d <- merge(subsetAnnotFilter()[ , list(varname = varname, gene = SYMBOL)],
+    #            subsetGTmiss(), by = "varname")
+    # 
+    # # d <- merge(ANNOT$AEPv2[ , list(varname, gene = SYMBOL)],
+    # #            GT[1:1000, 1:10], by = "varname")
+    # setcolorder(d, c("varname", "gene"))
+    # 
+    # out <- rbindlist(
+    #   lapply(c("TStage", "NStage", "MStage"), function(caco){
+    #     #lapply(c("GleasonScore", "TStage", "NStage", "MStage", "PSADiag"), function(caco){
+    #     #caco="TStage"
+    #     #lapply(c("TStage","NStage", "MStage"), function(caco){
+    #     # set the trait
+    #     if(caco %in% c("GleasonScore", "TStage", "PSADiag")){
+    #       skatTrait = "C" } else {
+    #         # NStage, MStage
+    #         skatTrait = "D"
+    #       }
+    #     #pp <- subsetPheno[ na.omit(match(tail(colnames(d), -2), StudyID)), ]
+    #     pp <- subsetPheno()[ na.omit(match(tail(colnames(d), -2), StudyID)), ]
+    #     ixSample <- which(!is.na(pp[ , ..caco ]))
+    #     
+    #     rbindlist(
+    #       lapply(split(d, d$gene), function(geneGT){
+    #         #gene = "LOXL4"; caco = "TStage"
+    #         #geneGT <- split(d, d$gene)[[ gene ]]
+    #         #ixVariant <- which(aa$SYMBOL == gene)
+    #         
+    #         # SKAT input
+    #         Y <- unlist(pp[ ixSample, ..caco ])
+    #         Z <- t(geneGT[ , -c(1:2) ][ , ..ixSample ])
+    #         Z[ Z == 9 ] <- NA
+    #         X <- pp[ ixSample, AgeDiag]
+    #         
+    #         obj <- SKAT_Null_Model( Y ~ X, out_type = skatTrait)
+    #         res <- SKAT(Z, obj)
+    #         
+    #         #output
+    #         if(caco == "PSADiag"){
+    #           x <- table(cut(Y, c(0, 3, 5, Inf)))
+    #         } else {
+    #           x <- table(Y)
+    #         }
+    #         
+    #         data.table(Gene = head(geneGT$gene, 1),
+    #                    CaCo = caco,
+    #                    CaCoN = paste(paste(names(x), x, sep = "="), collapse = "; "),
+    #                    Trait = skatTrait,
+    #                    P = res$p.value,
+    #                    n.marker = res$param$n.marker,
+    #                    n.marker.test = res$param$n.marker.test)
+    #         
+    #       }))
+    #   }))
+    # 
+    # #return
+    # out[ order(P), ]
+    
+    
+  }) # END statBurden
   # ~Pathway SKAT ------------------------------------------------------------
   # ~Pathway Burden ----------------------------------------------------------
   
-  
+  # QC -----------------------------------------------------------------------
+  # ~
   
   # Output ------------------------------------------------------------------
   output$annot <- renderDataTable({
@@ -268,18 +373,33 @@ shinyServer(function(input, output, session) {
   })
   
   output$genes <- renderDataTable({
-    data.frame(GeneCards = paste0("<a href='https://www.genecards.org/cgi-bin/carddisp.pl?gene=",
-                                  subsetGenes(),"' target='_blank'>", subsetGenes(), "</a>"))
+    d <- unique(subsetAnnotFilter()[, .(data, SYMBOL)])
+    d <- d[, list(Data = toString(data)), by = SYMBOL ]
+    d[ , list(Gene = paste0("<a href='https://www.genecards.org/cgi-bin/carddisp.pl?gene=",
+                            SYMBOL,"' target='_blank'>", SYMBOL, "</a>"), 
+              Data) ]
+    # data.frame(GeneCards = paste0("<a href='https://www.genecards.org/cgi-bin/carddisp.pl?gene=",
+    #                               subsetGenes(),"' target='_blank'>", subsetGenes(), "</a>"))
   }, escape = FALSE)
   
   # paste0('<a href="', link, gsub("rs", "", id, fixed = TRUE),
   #        '" target="_blank">', id, '</a>')
   
-  output$skat <- renderDataTable({
+  output$geneSkat <- renderDataTable({
     datatable(
-      statSKAT(), filter = "top", rownames = FALSE,
+      statSKAT(), 
+      #data.frame(x = "testing gene SKAT output"),
+      filter = "top", rownames = FALSE,
       extensions = c("Buttons", "FixedHeader"), options = DToptions)
   })
+  
+  output$geneBurden <- renderDataTable({
+    datatable(
+      data.frame(x = "testing gene burden output"),
+      filter = "top", rownames = FALSE,
+      extensions = c("Buttons", "FixedHeader"), options = DToptions)
+  })
+  
   #~Plot: GT qc geneSet -------------------------------------------------------
   output$qcMissGT <- renderPlot({
     d <- rbind(
@@ -311,9 +431,8 @@ shinyServer(function(input, output, session) {
         gene = i$SYMBOL[ 1 ],
         setNames(data.frame(table(unlist(i[, -c("varname", "SYMBOL")]),
                                   useNA = "always") / 
-                              prod(dim(i[, -c("varname", "SYMBOL")]))
-        ), 
-        c("GT", "Freq"))
+                              prod(dim(i[, -c("varname", "SYMBOL")]))), 
+                 c("GT", "Freq"))
       )
       
     }))
@@ -361,10 +480,10 @@ shinyServer(function(input, output, session) {
     dd$x <- factor(dd$x, levels = c("SYMBOL", "IMPACT", "LoF", "REVEL", "CADD_PHRED"))
     
     ggplot(dd, aes(x, id = id, split = y, value = value)) +
-      #geom_parallel_sets(aes_string(fill = input$plotParallelGrp), alpha = 0.3, axis.width = 0.1) +
-      geom_parallel_sets(aes_string(fill = input$plotParallelVariantGrp), alpha = 0.3, axis.width = 0.1) +
-      geom_parallel_sets_axes(axis.width = 0.1) +
-      geom_parallel_sets_labels(colour = 'white') +
+      geom_parallel_sets(aes_string(fill = input$plotParallelVariantGrp), 
+                         alpha = 0.3, axis.width = 0.3) +
+      geom_parallel_sets_axes(axis.width = 0.3) +
+      geom_parallel_sets_labels(colour = 'white', angle = 0) +
       scale_x_discrete(name = NULL) +
       ggtitle("Parallel plot: Annotaion relationships", 
               paste0("n = ", nrow(subsetAnnotFilter()))
@@ -373,12 +492,20 @@ shinyServer(function(input, output, session) {
   })
   #~Plot: Variant overlap ---------------------------------------
   output$variantOverlap <- renderPlot({
+    d <- subsetAnnot()[, .(data, varname)]
+    d <- split(d$varname, d$data)
+    
+    fit <- euler(d, shape = "ellipse")
+    plot(fit, quantities = TRUE, main = "Variant overlap")
+  })
+  output$variantSubsetOverlap <- renderPlot({
     d <- subsetAnnotFilter()[, .(data, varname)]
     d <- split(d$varname, d$data)
     
     fit <- euler(d, shape = "ellipse")
-    plot(fit, quantities = TRUE)
+    plot(fit, quantities = TRUE, main = "Variant subset overlap")
   })
+  
   
   #~Plot: Gene overlap ---------------------------------------
   output$geneOverlap <- renderPlot({
@@ -386,47 +513,56 @@ shinyServer(function(input, output, session) {
     d <- split(d$SYMBOL, d$data)
     
     fit <- euler(d, shape = "ellipse")
-    plot(fit, quantities = TRUE)
+    plot(fit, quantities = TRUE, main = "Gene overlap")
   })
   
   #~Plot: Pheno Parallel -----------------------------------------------------
   output$phenoParallel <- renderPlot({
     # data prep, no Nas, all factor
-    d <- subsetPheno()[, list(FH, COD_PrCa,
-                              AgeDiag = cut(AgeDiag, c(0, 40, 50, 60, 100), 
-                                            labels = c("<40", "40-50", "50-60", ">60")),
-                              GleasonScore = cut(GleasonScore, c(0, 6, 7, 10),
-                                                 labels = c("1-6", "7", "8-10")), 
-                              TStage, NStage, MStage,
-                              PSADiag = cut(PSADiag, c(0, 3, 5, 20, Inf),
-                                            labels = c("0-3", "4-5", "6-20", "20+")),
-                              NCCN, NICE
+    #d <- subsetPheno[, list(
+    d <- subsetPheno()[, list(
+      PrCa = PrCa, 
+      FH, COD_PrCa,
+      AgeDiag = cut(AgeDiag, c(0, 40, 50, 60, 100), 
+                          labels = c("<40", "40-50", "50-60", ">60")),
+      GleasonScore = cut(GleasonScore, c(0, 6, 7, 10),
+                         labels = c("1-6", "7", "8-10")), 
+      TStage, NStage, MStage,
+      PSADiag = cut(PSADiag, c(0, 3, 5, 20, Inf),
+                          labels = c("0-3", "4-5", "6-20", "20+")),
+      NCCN, NICE
     )]
     
     
     cols <- names(sapply(d, is.factor))[ sapply(d, is.factor) ]
     d[,(cols):= lapply(.SD, function(i){
-      factor(ifelse(is.na(i), "NA", as.character(i)),
-             levels = c(levels(i), "NA"))
-    }), .SDcols = cols]
+       factor(ifelse(is.na(as.character(i)), "NA", as.character(i)),
+              levels = c(levels(i), "NA"))
+     }), .SDcols = cols]
     
     d <- unique(d[ , value := .N, by = names(d)])
     
     dd <- gather_set_data(d, seq(ncol(d) - 1))
-    dd$x <- factor(dd$x, levels = c("FH", "COD_PrCa", "AgeDiag", "GleasonScore", "NCCN", "NICE", "TStage", "NStage", "MStage", "PSADiag"))
+    dd$x <- factor(dd$x, levels = c("PrCa", "FH", "COD_PrCa", "AgeDiag", "GleasonScore", "NCCN", "NICE", "TStage", "NStage", "MStage", "PSADiag"))
     
     ggplot(dd, aes(x, id = id, split = y, value = value)) +
-      geom_parallel_sets(aes_string(fill = input$plotParallelSampleGrp), alpha = 0.3, axis.width = 0.1) +
-      geom_parallel_sets_axes(axis.width = 0.1) +
-      geom_parallel_sets_labels(colour = 'white') +
+      geom_parallel_sets(aes_string(fill = input$plotParallelSampleGrp), 
+      #geom_parallel_sets(aes_string(fill = "FH"),
+                         alpha = 0.3, axis.width = 0.3) +
+      geom_parallel_sets_axes(axis.width = 0.3) +
+      geom_parallel_sets_labels(colour = 'white', angle = 0) +
       scale_x_discrete(name = NULL) +
       ggtitle("Parallel plot: Phenotype relationships", 
               paste0("n = ", nrow(subsetPheno()))) +
+              #paste0("n = ", nrow(subsetPheno))) +
       theme_minimal()
+    
+
+    
   })
   #~Plot: Pheno NAs  -----------------------------------------------------
   output$phenoNA <- renderPlot({
-    d <- subsetPheno()[, c("FH", "COD_PrCa", "AgeDiag", "GleasonScore", "NCCN", "NICE", "TStage", "NStage", "MStage", "PSADiag")]
+    d <- subsetPheno()[, c("PrCa", "FH", "COD_PrCa", "AgeDiag", "GleasonScore", "NCCN", "NICE", "TStage", "NStage", "MStage", "PSADiag")]
     d <- melt(ifelse(!is.na(d), "Yes", "No"), value.name = "Complete")
     
     ggplot(d, aes(x = Var2, fill = Complete)) +
@@ -437,13 +573,21 @@ shinyServer(function(input, output, session) {
       theme_minimal()
   })
   
-  #~Plot: Pheno sample overlap -------------------------------------------
-  output$phenoSampleOverlap <- renderPlot({
+  #~Plot: Sample overlap -------------------------------------------
+  output$sampleOverlap <- renderPlot({
     
     d <- SAMPLE[ input$data ]
     #d <- SAMPLE[ c("AEPv2", "DRG_2441") ]
     fit <- euler(d, shape = "ellipse")
-    plot(fit, quantities = TRUE)
+    plot(fit, quantities = TRUE, main = "Sample overlap")
+  })
+  
+  output$sampleSubsetOverlap <- renderPlot({
+    
+    d <- lapply(SAMPLE[ input$data ], function(i){intersect(i, subsetPheno()$StudyID)})
+    #d <- lapply(SAMPLE[ namesVCF[1:2] ], function(i){intersect(i, subsetPheno$Study.ID)})
+    fit <- euler(d, shape = "ellipse")
+    plot(fit, quantities = TRUE, main = "Sample subset overlap")
   })
   
   # Dynamic UI --------------------------------------------------------------  

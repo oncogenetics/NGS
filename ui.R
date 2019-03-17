@@ -32,12 +32,15 @@ shinyUI(
                  ),
                  conditionalPanel(
                    condition = "input.tabsetPanelMain == 'Variants'",
+                   radioButtons("plotParallelVariantGrp", "Parallel plot group:",
+                                c("SYMBOL", "IMPACT", "LoF", "REVEL", "CADD_PHRED"),
+                                inline = TRUE),
                    splitLayout(
                      sliderInput("qcMissVariant", "Variant missingness", min = 0, max = 0.5, value = 0.5),
-                     sliderInput("qcMissSample", "Sample missingness", min = 0, max = 0.5, value = 0.5),
-                     radioButtons("andOr", "FilterOption", choices = c("AND", "OR"),
-                                  selected = "OR", inline = TRUE)
+                     sliderInput("qcMissSample", "Sample missingness", min = 0, max = 0.5, value = 0.5)
                    ),
+                   radioButtons("andOr", "FilterOption", choices = c("AND", "OR"),
+                                selected = "OR", inline = TRUE),
                    
                    # ClinVar
                    selectInput("CLNSIG", "CLNSIG (ClinVar)", filterCol$CLNSIG,
@@ -51,24 +54,47 @@ shinyUI(
                    checkboxGroupInput("LoF", "LoF", filterCol$LoF, inline = TRUE),
                    checkboxGroupInput("SIFT", "SIFT", filterCol$SIFT, inline = TRUE),
                    checkboxGroupInput("PolyPhen", "PolyPhen", filterCol$PolyPhen,
-                                      inline = TRUE),
-                   radioButtons("plotParallelVariantGrp", "Parallel plot group:",
-                                c("SYMBOL", "IMPACT", "LoF", "REVEL", "CADD_PHRED"),
-                                inline = TRUE)
+                                      inline = TRUE)
                  ),
                  conditionalPanel(
-                   condition = "input.tabsetPanelMain == 'Phenotype'",
+                   condition = "input.tabsetPanelMain == 'Sample'",
                    radioButtons("plotParallelSampleGrp", "Parallel plot group:",
-                                c("FH", "COD_PrCa", "AgeDiag", "GleasonScore", "NCCN", "NICE", "TStage", "NStage", "MStage", "PSADiag"),
+                                c("PrCa", "FH", "COD_PrCa", "AgeDiag", "GleasonScore", 
+                                  "NCCN", "NICE", "TStage", "NStage", "MStage", "PSADiag"),
+                                selected = "AgeDiag",
                                 inline = TRUE),
-                   checkboxGroupInput("ethnicityOA", "Ethnicity OA:",
-                                      c("African", "Asian", "European", "Mixed_ethnic", NA),
+                   checkboxGroupInput("samplePrCa", "Prostate cancer:",
+                                      c("0", "1", "NA"),
+                                      selected = c("0", "1", "NA"),
+                                      inline = TRUE),
+                   checkboxGroupInput("sampleEthnicityOA", "Ethnicity OA:",
+                                      c("African", "Asian", "European", "Mixed_ethnic", "NA"),
                                       selected = "European",
                                       inline = TRUE),
-                   checkboxGroupInput("ethnicity", "Ethnicity:",
-                                      c("0", "1", "6", "7", "8", NA),
+                   checkboxGroupInput("sampleEthnicity", "Ethnicity Progeny:",
+                                      c("0", "1", "6", "7", "8", "NA"),
                                       selected = "1",
-                                      inline = TRUE)
+                                      inline = TRUE),
+                   splitLayout(
+                     checkboxGroupInput("sampleFH", "Family history:",
+                                        c("0", "1", "NA"), selected = c("0", "1", "NA"), inline = TRUE),
+                     checkboxGroupInput("sampleCOD", "COD PrCa:",
+                                        c(0, 1, "NA"), selected = c(0, 1, "NA"), inline = TRUE)),
+                   sliderInput("sampleAge", "AgeDiag:",
+                               min = 0, max = 100, value = c(20, 100), step = 2.5),
+                   sliderInput("sampleGleason", "Gleason:",
+                               min = 0, max = 10, value = c(2, 10), step = 1),
+                   sliderInput("samplePSADiag", "PSA at diagnosis:",
+                               min = -1, max = 100, value = c(0, 100), step = 1),
+                   checkboxGroupInput("sampleTStage", "TStage:",
+                                      c(1:4, "NA"), selected = c(1:4, "NA"), inline = TRUE),
+                   splitLayout(
+                     checkboxGroupInput("sampleNStage", "NStage:",
+                                        c(0, 1, "NA"), selected = c(0, 1, "NA"), inline = TRUE),
+                     checkboxGroupInput("sampleMStage", "MStage:",
+                                        c(0, 1, "NA"), selected = c(0, 1, "NA"), inline = TRUE)
+                   )
+                   
                    
                    
                    
@@ -85,38 +111,45 @@ shinyUI(
         tabPanel("Panel",
                  h4("Panel"),
                  hr(),
-                 dataTableOutput("genes"),
-                 plotOutput("geneOverlap")
+                 plotOutput("geneOverlap"), 
+                 dataTableOutput("genes")
+                 
         ),
         tabPanel("Variants",
                  h4("Variants"),
                  hr(),
                  #tableOutput("testInput"),
-                 plotOutput("variantOverlap"),
+                 splitLayout(
+                   plotOutput("variantOverlap", width = "80%"),
+                   plotOutput("variantSubsetOverlap", width = "80%")),
+                 hr(),
                  plotOutput("variantParallel"),
                  dataTableOutput("annot")),
-        tabPanel("Phenotype",
-                 h4("Phenotype"),
+        tabPanel("Sample",
+                 h4("Sample"),
                  hr(),
-                 plotOutput("phenoSampleOverlap"),
+                 #tableOutput("testFH"),
+                 splitLayout(
+                   plotOutput("sampleOverlap"),
+                   plotOutput("sampleSubsetOverlap")),
                  plotOutput("phenoParallel"),
                  plotOutput("phenoNA"),
                  dataTableOutput("pheno")
         ),
-        tabPanel("Genotype",
-                 h4("Genotype"),
+        tabPanel("QC",
+                 h4("QC"),
                  hr(),
                  tableOutput("testGT"),
-                 dataTableOutput("gt"),
                  plotOutput("qcMissGT"),
-                 plotOutput("qcMissGTperGene")
-                 
+                 plotOutput("qcMissGTperGene"),
+                 dataTableOutput("gt")
         ),
-        tabPanel("SKAT",
-                 h4("SKAT"),
-                 dataTableOutput("skat")),
-        tabPanel("Plots",
-                 h4("Plots"),
+        tabPanel("Stats",
+                 h4("Stats"),
+                 dataTableOutput("geneSkat"),
+                 dataTableOutput("geneBurden")),
+        tabPanel("Summary",
+                 h4("Summary"),
                  hr()),
         # ~~ Help -------------------------------------------------------
         tabPanel("Help",

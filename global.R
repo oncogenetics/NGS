@@ -41,14 +41,3 @@ DToptions <- list(
 # SAMPLE
 load("data/data.RData")
 
-# runApp(shinyApp(
-#   ui = fluidPage(
-#     DT::dataTableOutput("results", height = 300)
-#   ),
-#   server = function(input, output, session) {
-#     output$results <- DT::renderDataTable(
-#       mtcars,
-#       options = list(pageLength = 200, scrollY = TRUE)
-#     )
-#   }
-# ))

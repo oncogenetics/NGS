@@ -72,6 +72,23 @@ GT[ , value := max(value), by = .(varname, sampleID) ]
 GT <- unique(GT)
 GT <- dcast(GT, varname ~ sampleID)
 
+# fix MAF, flip: 0=common, 2=rare
+GTalleleCounts <- data.table(
+  AA = rowSums(GT[, -1] == 0, na.rm = TRUE),
+  AB = rowSums(GT[, -1] == 1, na.rm = TRUE),
+  BB = rowSums(GT[, -1] == 2, na.rm = TRUE),
+  NN = rowSums(is.na(GT[, -1])))
+
+# z <- x$AA + x$AB + x$BB
+# xx <- data.table(
+#   freqAA = x$AA/z,
+#   freqAB = x$AB/z,
+#   freqBB = x$BB/z)
+# boxplot(xx)
+
+
+
+
 # ~Sample ID ---------------------------------------------------------------
 SAMPLE <- lapply(list.files("data/ShinyAppInput/", pattern = "*.SAMPLE", full.names = TRUE), function(i){
   fread(i, header = FALSE)[, V1]
@@ -124,12 +141,13 @@ filterCol <- list(
 
 
 # ~ Phenotype ---------------------------------------------------------------
-pheno <- fread("data/20190215_progeny.csv",
+pheno <- fread("data/20190315_progeny.csv",
                check.names = TRUE, na.strings = c("U", "", "NA"))
 pheno <- pheno[ Study.ID %in% unique(unlist(SAMPLE)), ]
 
 pheno[ , rs138213197 := factor(rs138213197) ]
 pheno[ , EthnicityOA := factor(Onco_GenoAncestry) ]
+pheno[ , PrCa := factor(Cancer.Confirmed.and.Unconfirmed.Prostate, levels = c(0, 1)) ]
 pheno[ , COD_PrCa := factor(ifelse(tolower(Cause.of.death.is.PrCa) == "yes", 1,
                                    ifelse(tolower(Cause.of.death.is.PrCa) == "no", 0, NA))) ]
 pheno[ , TStage := factor(gsub("T", "", TStage, fixed = TRUE)) ]
@@ -142,10 +160,52 @@ pheno[ , PSADiag := round(PSADiag, 1) ]
 pheno[ , NCCN := factor(NCCN, levels = c("Low", "Intermediate", "High", "VeryHigh", "Metastatic")) ]
 pheno[ , NICE := factor(NICE, levels = c("Low", "Intermediate", "High")) ]
 
+# add IDs that are not in Progeny (mostly controls?)
+pheno <- merge(pheno, data.table(Study.ID = setdiff(colnames(GT[, -1]), pheno$Study.ID)), all = TRUE)
 
+
+# Concordance -------------------------------------------------------------
+GTc <- 
+  lapply(list.files("data/ShinyAppInput/", pattern = "*.GT", full.names = TRUE), function(i){
+    s <- fread(gsub(".GT", ".SAMPLE", i, fixed = TRUE), header = FALSE)[, V1]
+    d <- fread(i, drop = 1:5, col.names = s)
+    cols <- colnames(d)
+    d[ , (cols) := lapply(.SD, convertGT), .SDcols = cols ]
+    
+    varname <- fread(i, select = 1:5)
+    varname <- paste(varname$V1, varname$V2, varname$V4, varname$V5, sep = "_" )
+    
+    cbind(varname = varname, d)
+  })
+names(GTc) <- namesVCF
+
+cc <- combn(namesVCF, m = 2)
+overlapS <- apply(cc, 2, function(i){
+  intersect(SAMPLE[[ i[1] ]], SAMPLE[[ i[2] ]])
+  })
+names(overlapS) <- apply(cc, 2, paste, collapse = "_and_")
+# length(sort(unique(unlist(overlapS))))
+# 1193
+
+overlapV <- apply(cc, 2, function(i){
+  intersect(ANNOT[[ i[1] ]]$varname, ANNOT[[ i[2] ]]$varname)
+})
+names(overlapV) <- apply(cc, 2, paste, collapse = "_and_")
+# length(sort(unique(unlist(overlapV))))
+# [1] 70461
+
+# subset only sampels and vars that have any overlap with any other VCF
+GTc <- lapply(GTc, function(i){
+  # drop samples that have no overlapping vars even if samples overlap.
+  samples <- unique(unlist(overlapS[ lengths(overlapV) > 0 ]))
+  cols <- c("varname", intersect(colnames(i), samples))
+  i[ varname %in% unique(unlist(overlapV)), ..cols]  
+})
+# lapply(GTc, dim)
 
 # output ------------------------------------------------------------------
-save(ANNOT, GT, SAMPLE, geneListVCF, geneListPanel, namesVCF, filterCol, pheno,
+save(ANNOT, GT, GTalleleCounts, GTc, SAMPLE, geneListVCF, geneListPanel,
+     namesVCF, filterCol, pheno,
      file = "data/data.RData")
 
 
