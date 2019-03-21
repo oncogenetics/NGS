@@ -41,7 +41,9 @@ shinyUI(
                    ),
                    radioButtons("andOr", "FilterOption", choices = c("AND", "OR"),
                                 selected = "OR", inline = TRUE),
-                   
+                   #MAF
+                   sliderInput("ExAC_AF_NFE", "ExAC_AF_NFE *", min = 0, max = 1, value = 0.01),
+                   h6("* Non-Finnish European Allele Frequency from ExAC"),
                    # ClinVar
                    selectInput("CLNSIG", "CLNSIG (ClinVar)", filterCol$CLNSIG,
                                #selected = filterCol$CLNSIG[11],
@@ -55,7 +57,7 @@ shinyUI(
                    checkboxGroupInput("SIFT", "SIFT", filterCol$SIFT, inline = TRUE),
                    checkboxGroupInput("PolyPhen", "PolyPhen", filterCol$PolyPhen,
                                       inline = TRUE)
-                 ),
+                 ), # END input.tabsetPanelMain == 'Variants'
                  conditionalPanel(
                    condition = "input.tabsetPanelMain == 'Sample'",
                    radioButtons("plotParallelSampleGrp", "Parallel plot group:",
@@ -92,12 +94,13 @@ shinyUI(
                      checkboxGroupInput("sampleNStage", "NStage:",
                                         c(0, 1, "NA"), selected = c(0, 1, "NA"), inline = TRUE),
                      checkboxGroupInput("sampleMStage", "MStage:",
-                                        c(0, 1, "NA"), selected = c(0, 1, "NA"), inline = TRUE)
-                   )
-                   
-                   
-                   
-                   
+                                        c(0, 1, "NA"), selected = c(0, 1, "NA"), inline = TRUE))
+                 ), # END "input.tabsetPanelMain == 'Sample'"
+                 conditionalPanel(
+                   condition = "input.tabsetPanelMain == 'Stats'",
+                   checkboxGroupInput("cacoType", "Status:",
+                                      c("COD_PrCa", "FH", "GleasonScore", "TStage", "NStage", "MStage", "PSADiag", "NCCN", "NICE"),
+                                      selected = c("NStage", "MStage"), inline = TRUE)
                  )
                  
                  
@@ -112,9 +115,7 @@ shinyUI(
                  h4("Panel"),
                  hr(),
                  plotOutput("geneOverlap"), 
-                 dataTableOutput("genes")
-                 
-        ),
+                 dataTableOutput("genes")),
         tabPanel("Variants",
                  h4("Variants"),
                  hr(),
@@ -122,9 +123,8 @@ shinyUI(
                  splitLayout(
                    plotOutput("variantOverlap", width = "80%"),
                    plotOutput("variantSubsetOverlap", width = "80%")),
-                 hr(),
-                 plotOutput("variantParallel"),
-                 dataTableOutput("annot")),
+                 hr(), plotOutput("variantParallel"),
+                 hr(), dataTableOutput("annot")),
         tabPanel("Sample",
                  h4("Sample"),
                  hr(),
@@ -132,25 +132,32 @@ shinyUI(
                  splitLayout(
                    plotOutput("sampleOverlap"),
                    plotOutput("sampleSubsetOverlap")),
-                 plotOutput("phenoParallel"),
-                 plotOutput("phenoNA"),
+                 hr(), plotOutput("phenoParallel"),
+                 hr(), plotOutput("phenoNA"),
                  dataTableOutput("pheno")
         ),
         tabPanel("QC",
                  h4("QC"),
                  hr(),
                  tableOutput("testGT"),
-                 plotOutput("qcMissGT"),
+                 #plotOutput("qcMissGT"),
                  plotOutput("qcMissGTperGene"),
-                 dataTableOutput("gt")
+                 hr(), dataTableOutput("gt")
         ),
         tabPanel("Stats",
                  h4("Stats"),
-                 dataTableOutput("geneSkat"),
-                 dataTableOutput("geneBurden")),
+                 hr(),
+                 tabsetPanel(id = "skatBurdenTests", type = "pills",
+                             tabPanel("Mutation count", hr(), dataTableOutput("mutCount")),
+                             tabPanel("SKAT Gene", hr(), dataTableOutput("geneSkat")),
+                             tabPanel("Burden Gene", hr(), dataTableOutput("geneBurden")),
+                             tabPanel("SKAT Gene Set", hr(), h3("to-do")),
+                             tabPanel("Burden Gene Set", hr(), h3("to-do")))
+        ),
         tabPanel("Summary",
                  h4("Summary"),
-                 hr()),
+                 hr(),
+                 h3("to-do: some summary plots... ")),
         # ~~ Help -------------------------------------------------------
         tabPanel("Help",
                  h4("Help"),
