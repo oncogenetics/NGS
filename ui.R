@@ -9,6 +9,7 @@
 # Define UI ---------------------------------------------------------------
 shinyUI(
   fluidPage(
+    shinyjs::useShinyjs(),
     theme = shinytheme("united"),
     #titlePanel("NGS v0.1", "NGS"),
     titlePanel(title = div("NGS v0.1", img(src = "logoICR.png",
@@ -35,10 +36,6 @@ shinyUI(
                    radioButtons("plotParallelVariantGrp", "Parallel plot group:",
                                 c("SYMBOL", "IMPACT", "LoF", "REVEL", "CADD_PHRED"),
                                 inline = TRUE),
-                   splitLayout(
-                     sliderInput("qcMissVariant", "Variant missingness", min = 0, max = 0.5, value = 0.5),
-                     sliderInput("qcMissSample", "Sample missingness", min = 0, max = 0.5, value = 0.5)
-                   ),
                    radioButtons("andOr", "FilterOption", choices = c("AND", "OR"),
                                 selected = "OR", inline = TRUE),
                    #MAF
@@ -61,9 +58,12 @@ shinyUI(
                  conditionalPanel(
                    condition = "input.tabsetPanelMain == 'Sample'",
                    radioButtons("plotParallelSampleGrp", "Parallel plot group:",
-                                c("PrCa", "FH", "COD_PrCa", "AgeDiag", "GleasonScore", 
-                                  "NCCN", "NICE", "TStage", "NStage", "MStage", "PSADiag"),
-                                selected = "AgeDiag",
+                                c("Mutation", "PrCa", "FH", "COD_PrCa", "AgeDiag",
+                                  "GleasonScore", "Gleason7",
+                                  "NCCN", "NICE", 
+                                  "TStage", "NStage", "MStage", 
+                                  "PSADiag"),
+                                selected = "Mutation",
                                 inline = TRUE),
                    checkboxGroupInput("samplePrCa", "Prostate cancer:",
                                       c("0", "1", "NA"),
@@ -97,9 +97,16 @@ shinyUI(
                                         c(0, 1, "NA"), selected = c(0, 1, "NA"), inline = TRUE))
                  ), # END "input.tabsetPanelMain == 'Sample'"
                  conditionalPanel(
+                   condition = "input.tabsetPanelMain == 'Panel'",
+                     sliderInput("qcMissVariant", "Variant missingness", min = 0, max = 0.5, value = 0.5),
+                     sliderInput("qcMissSample", "Sample missingness", min = 0, max = 0.5, value = 0.5)
+                   ),
+                 conditionalPanel(
                    condition = "input.tabsetPanelMain == 'Stats'",
                    checkboxGroupInput("cacoType", "Status:",
-                                      c("COD_PrCa", "FH", "GleasonScore", "TStage", "NStage", "MStage", "PSADiag", "NCCN", "NICE"),
+                                      c("COD_PrCa", "FH", 
+                                        "GleasonScore", "Gleason7", 
+                                        "TStage", "NStage", "MStage", "PSADiag", "NCCN", "NICE"),
                                       selected = c("NStage", "MStage"), inline = TRUE)
                  )
                  
@@ -147,12 +154,21 @@ shinyUI(
         tabPanel("Stats",
                  h4("Stats"),
                  hr(),
-                 tabsetPanel(id = "skatBurdenTests", type = "pills",
+                 tabsetPanel(id = "stats", type = "pills",
                              tabPanel("Mutation count", hr(), dataTableOutput("mutCount")),
-                             tabPanel("SKAT Gene", hr(), dataTableOutput("geneSkat")),
+                             tabPanel("dNdScv", hr(),
+                                      dataTableOutput("dNdScv"),
+                                      h4("Input data for dNdScv"),
+                                      dataTableOutput("dNdScvInput")),
+                             tabPanel("SKAT Gene", hr(),
+                                      dataTableOutput("geneSkat"),
+                                      hr(),
+                                      textOutput("geneSkatConsole")
+                                      ),
                              tabPanel("Burden Gene", hr(), dataTableOutput("geneBurden")),
-                             tabPanel("SKAT Gene Set", hr(), h3("to-do")),
-                             tabPanel("Burden Gene Set", hr(), h3("to-do")))
+                             tabPanel("SKAT gene set", hr(), 
+                                      dataTableOutput("allGenesSkat")),
+                             tabPanel("Burden gene set", hr(), h3("to-do")))
         ),
         tabPanel("Summary",
                  h4("Summary"),

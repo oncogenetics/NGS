@@ -33,7 +33,7 @@ names(SAMPLE) <- namesVCF
 
 
 # ~Phenotype ---------------------------------------------------------------
-pheno <- fread("data/20190315_progeny.csv",
+pheno <- fread("data/20190411_progeny.csv",
                check.names = TRUE, na.strings = c("U", "", "NA"))
 pheno <- pheno[ Study.ID %in% unique(unlist(SAMPLE)), ]
 
@@ -52,9 +52,8 @@ pheno[ , PSADiag := round(PSADiag, 1) ]
 pheno[ , NCCN := factor(NCCN, levels = c("Low", "Intermediate", "High", "VeryHigh", "Metastatic")) ]
 pheno[ , NICE := factor(NICE, levels = c("Low", "Intermediate", "High")) ]
 
-# add IDs that are not in Progeny (mostly controls?)
-#pheno <- merge(pheno, data.table(Study.ID = setdiff(colnames(GT[, -1]), pheno$Study.ID)), all = TRUE)
-
+pheno[ , Gleason7 := factor(GroupGleason12, levels = c("34", "43")) ]
+       
 SAMPLE <- lapply(SAMPLE, function(i) intersect(i, pheno$Study.ID))
 
 
